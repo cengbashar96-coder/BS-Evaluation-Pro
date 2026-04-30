@@ -1,0 +1,27 @@
+{
+  "name": "B.S Evaluation",
+  "short_name": "B.S Eval",
+  "description": "تقييم الوضع الراهن القائم للمنشآت - Evaluation of RC Structures",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["engineering", "construction", "productivity"],
+  "lang": "ar",
+  "dir": "rtl"
+}
