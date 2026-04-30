@@ -1,0 +1,219 @@
+// ملف تعريف قاعدة البيانات المدمج - الإصدار الاحترافي الكامل (B.S-Evaluation-Pro)
+// هذا الملف يجمع بين نظام التراخيص السحابي والمعايير الهندسية الدقيقة
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. نظام الهوية والتراخيص (The Core)
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String    // لتأمين الدخول
+  role          Role      @default(USER) // ADMIN (أنت) أو USER (المهندسين)
+  isActivated   Boolean   @default(false) // التفعيل اليدوي من قبلك
+  licenseType   String    @default("FREE") 
+  createdAt     DateTime  @default(now())
+  
+  // علاقة المستخدم بمشاريعه الهندسية
+  projects      Project[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// ==========================================
+// 2. سجل المشروع الرئيسي (Project Record)
+// ==========================================
+
+model Project {
+  id                String   @id @default(cuid())
+  name              String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // الربط بكافة الواجهات الهندسية
+  buildingInfo      BuildingInfo?
+  floorReports      FloorReport[]
+  structuralReport  StructuralReport?
+  foundations       Foundation[]
+  columns           ColumnWall[]
+  beams             BeamSlab[]
+  electrical        ElectricalReport?
+  plumbing          PlumbingReport?
+  technicalNotes    TechnicalNotes?
+  engineers         Engineer[]
+}
+
+// ==========================================
+// 3. الواجهات الهندسية التفصيلية
+// ==========================================
+
+// الواجهة 1: بيانات المنشأة
+model BuildingInfo {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  propertyNumber    String?
+  previousLicense   String?
+  licenseDate       String?
+  area              String?
+  ownerName         String?
+  buildingComponent String?
+  floorCount        Int?
+  buildingUsage     String?
+  locationImage     String?
+  locationDescription String?
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// الواجهة 2: التقرير الوصفي المعماري
+model FloorReport {
+  id              String   @id @default(cuid())
+  projectId       String
+  floorNumber     String
+  floorArea       Float?
+  projectionArea  Float?
+  elevation       Float?
+  notes           String?
+  observations    String?
+  
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+}
+
+// الواجهة 3: التقرير الفني الإنشائي
+model StructuralReport {
+  id                          String   @id @default(cuid())
+  projectId                   String   @unique
+  structuralSystem            String?
+  schmidtReport               String?
+  schmidtConcreteStrength     Float?   
+  soilMechanicsReport         String?
+  soilType                    String?
+  foundationDepth             Float?
+  soilCapacity                Float?   
+  
+  project                     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// الواجهة 4: الأساسات
+model Foundation {
+  id                String   @id @default(cuid())
+  projectId         String
+  hasBasement       Boolean  @default(false)
+  basementDesc      String?
+  foundationType    String   
+  foundationDepth   Float?
+  foundationModel   String   
+  length            Float?
+  width             Float?
+  height            Float?
+  totalLoad         Float?   
+  actualStress      Float?   
+  isVerified        Boolean  @default(false) 
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+}
+
+// الواجهة 5: الأعمدة والجدران الخرسانية
+model ColumnWall {
+  id                String   @id @default(cuid())
+  projectId         String
+  columnType        String   
+  floorNumber       String
+  width             Float?   
+  depth             Float?   
+  totalLoad         Float?   
+  actualStress      Float?   
+  allowableStress   Float?   
+  isVerified        Boolean  @default(false) 
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+}
+
+// الواجهة 6: البلاطات والجوائز الخرسانية
+model BeamSlab {
+  id                String   @id @default(cuid())
+  projectId         String
+  element           String   
+  floorNumber       String
+  supportType       String   
+  span              Float?   
+  width             Float?   
+  thickness         Float?   
+  totalLoad         Float?   
+  isVerified        Boolean  @default(false) 
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+}
+
+// الواجهة 7: التمديدات الكهربائية
+model ElectricalReport {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  installation      String?
+  electricalNotes   String?
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// الواجهة 8: التمديدات الصحية
+model PlumbingReport {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  freshWaterNotes   String?
+  wastewaterNotes   String?
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// الواجهة 9: الملاحظات والمشاهدات الفنية
+model TechnicalNotes {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  architecturalNotes    String?
+  structuralNotes       String?
+  requirements          String?
+  suggestions           String?
+  
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// الواجهة 10: المهندسين والتوقيعات
+model Engineer {
+  id                String   @id @default(cuid())
+  projectId         String
+  sequence          Int
+  specialty         String   
+  name              String   
+  unionNumber       String?  
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+}
+
+// إعدادات النظام العامة
+model Settings {
+  id                String   @id @default(cuid())
+  language          String   @default("ar")
+  lengthUnit        String   @default("cm")
+  loadUnit          String   @default("ton")
+  stressUnit        String   @default("kg/cm²")
+}
