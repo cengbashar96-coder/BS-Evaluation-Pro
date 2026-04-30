@@ -1,0 +1,72 @@
+import prisma from '@/lib/prisma';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+
+export default async function ProjectPage({ params }: { params: { id: string } }) {
+  // جلب بيانات المشروع مع تفاصيله من Supabase
+  const project = await prisma.project.findUnique({
+    where: { id: params.id },
+  });
+
+  if (!project) {
+    notFound();
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8 text-right" dir="rtl">
+      <div className="max-w-5xl mx-auto">
+        {/* رأس الصفحة */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border-b-4 border-blue-600 mb-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+              <p className="text-gray-500 mt-2">الموقع: {project.location || 'غير محدد'}</p>
+            </div>
+            <div className="bg-blue-50 px-4 py-2 rounded-lg text-blue-700 font-bold">
+              {project.floors} طوابق
+            </div>
+          </div>
+        </div>
+
+        {/* أقسام المعاينة الإنشائية */}
+        <h2 className="text-xl font-bold mb-6 text-gray-800 border-r-4 border-orange-500 pr-3">سجلات المعاينة الفنية</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* كرت معاينة الأساسات */}
+          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition group">
+            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-200">
+              🏗️
+            </div>
+            <h3 className="font-bold text-lg mb-2">معاينة الأساسات</h3>
+            <p className="text-sm text-gray-500 mb-4">تسجيل بيانات القواعد، الشناجات، وحالة التربة.</p>
+            <Link href={`/dashboard/project/${params.id}/foundations`} className="text-orange-600 font-medium hover:underline">
+              فتح السجل ←
+            </Link>
+          </div>
+
+          {/* كرت معاينة الأعمدة */}
+          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition group">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-200">
+              🏛️
+            </div>
+            <h3 className="font-bold text-lg mb-2">معاينة الأعمدة</h3>
+            <p className="text-sm text-gray-500 mb-4">تسجيل أبعاد الأعمدة، التسليح، وحالة الخرسانة.</p>
+            <Link href={`/dashboard/project/${params.id}/columns`} className="text-blue-600 font-medium hover:underline">
+              فتح السجل ←
+            </Link>
+          </div>
+
+          {/* كرت معاينة الجوائز والأسقف */}
+          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition group">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-200">
+              📏
+            </div>
+            <h3 className="font-bold text-lg mb-2">الجوائز والأسقف</h3>
+            <p className="text-sm text-gray-500 mb-4">توثيق حالة العناصر الأفقية والتشققات إن وجدت.</p>
+            <button className="text-green-600 font-medium opacity-50 cursor-not-allowed">قريباً</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
