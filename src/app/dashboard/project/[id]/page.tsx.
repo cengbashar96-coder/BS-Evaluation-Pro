@@ -1,72 +1,164 @@
-import prisma from '@/lib/prisma';
+'use client'
+
+import { useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { 
+  Building2, 
+  Construction, 
+  Columns, 
+  Layers, 
+  ArrowRight, 
+  CheckCircle2, 
+  Clock, 
+  MapPin,
+  LayoutDashboard
+} from 'lucide-react';
+import { useProjectStore } from '@/store/projectStore';
+import { prisma } from '@/lib/prisma'; // تأكد من المسار الصحيح لـ prisma
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
-  // جلب بيانات المشروع مع تفاصيله من Supabase
-  const project = await prisma.project.findUnique({
-    where: { id: params.id },
-  });
+// ملاحظة: بما أننا نستخدم "use client"، يفضل جلب البيانات الأساسية عبر useEffect 
+// أو تمريرها كـ Props إذا كانت الصفحة Server Component. 
+// هنا سأقوم بتحويلها لتكون متوافقة مع الـ Store الخاص بك.
 
-  if (!project) {
-    notFound();
+export default function ProjectPage({ params }: { params: { id: string } }) {
+  const { buildingInfo, fetchProjectData, isLoading } = useProjectStore();
+  const [projectData, setProjectData] = useState<any>(null);
+
+  useEffect(() => {
+    // جلب البيانات الأولية للمشروع عند تحميل الصفحة
+    const loadData = async () => {
+      try {
+        const response = await fetch(`/api/projects/${params.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setProjectData(data);
+        }
+      } catch (error) {
+        console.error("Error loading project:", error);
+      }
+    };
+    loadData();
+  }, [params.id]);
+
+  if (!projectData && !isLoading) {
+    // في حال عدم وجود المشروع (يمكن تحسين هذا الجزء لاحقاً بـ Loading Skeleton)
+    return <div className="p-20 text-center">جاري تحميل بيانات المشروع...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 text-right" dir="rtl">
-      <div className="max-w-5xl mx-auto">
-        {/* رأس الصفحة */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border-b-4 border-blue-600 mb-8">
-          <div className="flex justify-between items-start">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 text-right" dir="rtl">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* رأس الصفحة الاحترافي - Hero Section */}
+        <div className="relative overflow-hidden bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-              <p className="text-gray-500 mt-2">الموقع: {project.location || 'غير محدد'}</p>
+              <div className="flex items-center gap-2 text-emerald-600 mb-2">
+                <LayoutDashboard className="h-5 w-5" />
+                <span className="text-sm font-bold tracking-wider uppercase">لوحة تحكم المشروع</span>
+              </div>
+              <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-3">
+                {projectData?.name || 'تحميل...'}
+              </h1>
+              <div className="flex flex-wrap gap-4 text-slate-500">
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-sm">
+                  <MapPin className="h-4 w-4" />
+                  {projectData?.location || 'لم يحدد الموقع بعد'}
+                </div>
+                <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-full text-sm font-bold">
+                  <Building2 className="h-4 w-4" />
+                  {projectData?.floors || 0} طوابق
+                </div>
+              </div>
             </div>
-            <div className="bg-blue-50 px-4 py-2 rounded-lg text-blue-700 font-bold">
-              {project.floors} طوابق
+            
+            <div className="flex flex-col items-end gap-2">
+              <span className="text-xs text-slate-400 font-medium italic">آخر تحديث: {new Date().toLocaleDateString('ar-SY')}</span>
+              <div className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-2xl font-bold shadow-lg shadow-slate-200 dark:shadow-none">
+                ID: {params.id.slice(0, 8)}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* أقسام المعاينة الإنشائية */}
-        <h2 className="text-xl font-bold mb-6 text-gray-800 border-r-4 border-orange-500 pr-3">سجلات المعاينة الفنية</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* كرت معاينة الأساسات */}
-          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition group">
-            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-200">
-              🏗️
-            </div>
-            <h3 className="font-bold text-lg mb-2">معاينة الأساسات</h3>
-            <p className="text-sm text-gray-500 mb-4">تسجيل بيانات القواعد، الشناجات، وحالة التربة.</p>
-            <Link href={`/dashboard/project/${params.id}/foundations`} className="text-orange-600 font-medium hover:underline">
-              فتح السجل ←
-            </Link>
+        {/* شبكة سجلات المعاينة الفنية */}
+        <div>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-8 w-1.5 bg-orange-500 rounded-full"></div>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">سجلات المعاينة والتقارير الفنية</h2>
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* كرت 1: الأساسات */}
+            <ProjectCard 
+              title="معاينة الأساسات"
+              description="توثيق القواعد، الشناجات، وفحوصات التربة الميدانية."
+              icon={<Construction className="h-6 w-6 text-orange-600" />}
+              href={`/dashboard/project/${params.id}/foundations`}
+              color="orange"
+            />
 
-          {/* كرت معاينة الأعمدة */}
-          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition group">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-200">
-              🏛️
-            </div>
-            <h3 className="font-bold text-lg mb-2">معاينة الأعمدة</h3>
-            <p className="text-sm text-gray-500 mb-4">تسجيل أبعاد الأعمدة، التسليح، وحالة الخرسانة.</p>
-            <Link href={`/dashboard/project/${params.id}/columns`} className="text-blue-600 font-medium hover:underline">
-              فتح السجل ←
-            </Link>
-          </div>
+            {/* كرت 2: الأعمدة والجدران */}
+            <ProjectCard 
+              title="الأعمدة والجدران"
+              description="فحص الأبعاد، الشاقولية، وتسليح العناصر الرأسية."
+              icon={<Columns className="h-6 w-6 text-blue-600" />}
+              href={`/dashboard/project/${params.id}/columns`}
+              color="blue"
+            />
 
-          {/* كرت معاينة الجوائز والأسقف */}
-          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition group">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-200">
-              📏
-            </div>
-            <h3 className="font-bold text-lg mb-2">الجوائز والأسقف</h3>
-            <p className="text-sm text-gray-500 mb-4">توثيق حالة العناصر الأفقية والتشققات إن وجدت.</p>
-            <button className="text-green-600 font-medium opacity-50 cursor-not-allowed">قريباً</button>
+            {/* كرت 3: الجوائز والأسقف */}
+            <ProjectCard 
+              title="الجوائز والأسقف"
+              description="دراسة العناصر الأفقية، التشققات، والترخيم الملاحظ."
+              icon={<Layers className="h-6 w-6 text-emerald-600" />}
+              href={`/dashboard/project/${params.id}/beams`}
+              color="emerald"
+              status="soon"
+            />
+
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// مكون فرعي للكرت لضمان نظافة الكود (Sub-Component)
+function ProjectCard({ title, description, icon, href, color, status = 'active' }: any) {
+  const colors: any = {
+    orange: 'bg-orange-50 border-orange-100 text-orange-600 hover:border-orange-300',
+    blue: 'bg-blue-50 border-blue-100 text-blue-600 hover:border-blue-300',
+    emerald: 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:border-emerald-300',
+  };
+
+  if (status === 'soon') {
+    return (
+      <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 opacity-60">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-slate-200`}>
+          {icon}
+        </div>
+        <h3 className="font-black text-xl mb-2 text-slate-400">{title}</h3>
+        <p className="text-slate-400 text-sm leading-relaxed mb-6">{description}</p>
+        <span className="text-xs font-bold bg-slate-200 text-slate-500 px-3 py-1 rounded-full">قريباً</span>
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className="group bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-300 relative overflow-hidden">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 duration-300 ${colors[color]}`}>
+        {icon}
+      </div>
+      <h3 className="font-black text-xl mb-2 text-slate-900 dark:text-white group-hover:text-emerald-600 transition-colors">{title}</h3>
+      <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6">{description}</p>
+      <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-tight">
+        فتح السجل الفني
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-[-4px]" />
+      </div>
+    </Link>
   );
 }
