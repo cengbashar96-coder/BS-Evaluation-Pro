@@ -1,52 +1,53 @@
 'use client'
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Building2, Hammer, Layers } from 'lucide-react';
+import { Save, Building2, Hammer, Layers, ShieldCheck } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/translations';
 import { useProjectStore, type StructuralReport } from '@/store/projectStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { toast } from 'sonner';
 
 /**
- * Structural Page
+ * Structural Page - المراجعة الاحترافية
  * الواجهة السادسة: التقرير الفني الإنشائي
- * تجمع بيانات الجملة الإنشائية، مطرقة شميدت، وميكانيك التربة
+ * تم ضبطها لتتوافق مع نظام الربط السحابي (Prisma) وعزل المشاريع
  */
 export default function StructuralPage() {
   const { t, language } = useTranslation();
+  const params = useParams();
+  const projectId = params.id as string; // المعرف الفريد لضمان أمن وعزل البيانات
+  
   const { updateStructuralReport } = useProjectStore();
   const { stressUnit } = useSettingsStore();
   
   const [formData, setFormData] = useState<StructuralReport>({});
   const [loading, setLoading] = useState(false);
 
-  // تحميل البيانات المحفوظة محلياً (Persisted Data)
+  // تحميل البيانات بناءً على معرف المشروع حصراً لضمان الأمان
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('bs-structural-report');
+    if (typeof window !== 'undefined' && projectId) {
+      const stored = localStorage.getItem(`bs-structural-report-${projectId}`);
       if (stored) {
         setFormData(JSON.parse(stored));
       }
     }
-  }, []);
-
-  // تفريغ النموذج عند البدء بمشروع جديد
-  useEffect(() => {
-    const handleNewProject = () => setFormData({});
-    window.addEventListener('project:new', handleNewProject);
-    return () => window.removeEventListener('project:new', handleNewProject);
-  }, []);
+  }, [projectId]);
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      localStorage.setItem('bs-structural-report', JSON.stringify(formData));
+      // حفظ البيانات محلياً مع ربطها بالـ ID لضمان المزامنة الصحيحة لاحقاً
+      localStorage.setItem(`bs-structural-report-${projectId}`, JSON.stringify(formData));
+      
+      // تحديث الحالة العامة للمشروع (Zustand Store)
       updateStructuralReport(formData);
+      
       toast.success(t.buildingInfo.projectSaved);
     } catch (error) {
       toast.error(t.common.error);
@@ -59,7 +60,6 @@ export default function StructuralPage() {
     setFormData({ ...formData, [field]: value });
   };
 
-  // وظيفة لتحديد وحدة الإجهاد المختارة من الإعدادات
   const getStressUnitLabel = () => {
     switch (stressUnit) {
       case 'kg/cm²': return t.structural.schmidtUnit;
@@ -72,40 +72,42 @@ export default function StructuralPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-8">
-      <Card className="w-full border-t-4 border-t-emerald-600 shadow-sm">
+      <Card className="w-full border-t-4 border-t-emerald-600 shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400">
-            <Building2 className="h-6 w-6" />
+          <div className="flex justify-center mb-2 text-emerald-600">
+             <ShieldCheck className="h-8 w-8" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
             {t.structural.title}
           </CardTitle>
           <CardDescription>
-            {t.structural.structuralSystemDesc}
+            توثيق الجملة الإنشائية واختبارات التربة للمشروع رقم: {projectId.substring(0, 8)}...
           </CardDescription>
         </CardHeader>
+        
         <CardContent className="space-y-8">
           
-          {/* قسم الجملة الإنشائية */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400 border-b pb-2">
+          {/* قسم الجملة الإنشائية - مطابق لـ Prisma Field: structuralSystem */}
+          <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
+            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 border-b pb-2">
               <Layers className="h-4 w-4" />
               {t.structural.structuralSystem}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="structuralSystem">{t.structural.structuralSystem}</Label>
               <Textarea
                 id="structuralSystem"
                 value={formData.structuralSystem || ''}
                 onChange={(e) => handleChange('structuralSystem', e.target.value)}
-                placeholder="وصف الجملة الإنشائية (إطارات، جدران قص، إلخ...)"
+                placeholder="صف الجملة الإنشائية (إطارات بيتونية، جدران قص، إلخ...)"
                 rows={3}
-                className={language === 'ar' ? 'text-right' : 'text-left'}
+                className="bg-white dark:bg-slate-800"
               />
             </div>
           </div>
 
-          {/* قسم اختبارات المقاومة (مطرقة شميدت) */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400 border-b pb-2">
+          {/* قسم اختبارات المقاومة - مطابق لـ Prisma Field: schmidtConcreteStrength */}
+          <div className="space-y-4 p-4 border rounded-xl shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 border-b pb-2">
               <Hammer className="h-4 w-4" />
               {t.structural.schmidtReport}
             </div>
@@ -121,28 +123,26 @@ export default function StructuralPage() {
                   value={formData.schmidtConcreteStrength || ''}
                   onChange={(e) => handleChange('schmidtConcreteStrength', parseFloat(e.target.value) || 0)}
                   placeholder="0.00"
-                  className={language === 'ar' ? 'text-right' : 'text-left'}
                 />
               </div>
             </div>
           </div>
 
-          {/* قسم ميكانيك التربة */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400 border-b pb-2">
+          {/* قسم ميكانيك التربة - مطابق لحقول Prisma: soilType, foundationDepth, soilCapacity... */}
+          <div className="space-y-4 p-4 border rounded-xl shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700 border-b pb-2">
               <Layers className="h-4 w-4" />
               {t.structural.soilMechanicsReport}
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
               <div className="space-y-2">
                 <Label htmlFor="soilType">{t.structural.soilType}</Label>
                 <Input
                   id="soilType"
                   value={formData.soilType || ''}
                   onChange={(e) => handleChange('soilType', e.target.value)}
-                  placeholder="مثال: غضارية، صخرية..."
-                  className={language === 'ar' ? 'text-right' : 'text-left'}
+                  placeholder="غضارية، رملية..."
                 />
               </div>
 
@@ -154,8 +154,6 @@ export default function StructuralPage() {
                   step="0.01"
                   value={formData.foundationDepth || ''}
                   onChange={(e) => handleChange('foundationDepth', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className={language === 'ar' ? 'text-right' : 'text-left'}
                 />
               </div>
 
@@ -167,61 +165,31 @@ export default function StructuralPage() {
                   step="0.01"
                   value={formData.soilCapacity || ''}
                   onChange={(e) => handleChange('soilCapacity', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className={language === 'ar' ? 'text-right' : 'text-left'}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="soilFrictionAngle">{t.structural.soilFrictionAngle} (°)</Label>
-                <Input
-                  id="soilFrictionAngle"
-                  type="number"
-                  step="0.1"
-                  value={formData.soilFrictionAngle || ''}
-                  onChange={(e) => handleChange('soilFrictionAngle', parseFloat(e.target.value) || 0)}
-                  placeholder="0.0"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="groundwaterLevel">{t.structural.groundwaterLevel} (م)</Label>
-                <Input
-                  id="groundwaterLevel"
-                  type="number"
-                  step="0.01"
-                  value={formData.groundwaterLevel || ''}
-                  onChange={(e) => handleChange('groundwaterLevel', e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <Label htmlFor="soilNotes">{t.structural.soilNotes}</Label>
               <Textarea
                 id="soilNotes"
                 value={formData.soilNotes || ''}
                 onChange={(e) => handleChange('soilNotes', e.target.value)}
                 rows={3}
-                className={language === 'ar' ? 'text-right' : 'text-left'}
+                className="bg-slate-50 dark:bg-slate-900"
               />
             </div>
           </div>
 
-          {/* زر الحفظ */}
-          <div className="flex justify-end pt-6 border-t">
-            <Button
-              onClick={handleSave}
-              disabled={loading}
-              className="gap-2 px-8 bg-gradient-to-r from-emerald-600 to-teal-700 shadow-md"
-            >
-              <Save className="h-4 w-4" />
-              {loading ? t.common.loading : t.common.save}
-            </Button>
-          </div>
+          {/* زر الحفظ النهائي */}
+          <Button
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all active:scale-95 shadow-lg"
+          >
+            <Save className="h-5 w-5 ml-2" />
+            {loading ? t.common.loading : t.common.save}
+          </Button>
         </CardContent>
       </Card>
     </div>
