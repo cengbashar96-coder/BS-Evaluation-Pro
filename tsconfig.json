@@ -24,10 +24,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    }
+  "@/*": ["./src/*"],
+  "@/lib/*": ["./src/store/lib/*"] 
+}
   },
   "include": [
     "next-env.d.ts",
