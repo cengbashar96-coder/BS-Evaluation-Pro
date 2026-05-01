@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Save, FileText, Edit3, Lightbulb, ClipboardList, Building2, Hammer, Target, ShieldCheck } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore, type TechnicalNotes } from '@/store/projectStore';
 import { toast } from 'sonner';
 
