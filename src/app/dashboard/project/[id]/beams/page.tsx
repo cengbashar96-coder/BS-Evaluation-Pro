@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Plus, Edit2, Trash2, Save, Layers, CheckCircle2, XCircle, AlertTriangle, Calculator 
 } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore, BeamSlab } from '@/store/projectStore';
 import { toast } from 'sonner';
 
