@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, Building2, Hammer, Layers, ShieldCheck } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore, type StructuralReport } from '@/store/projectStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { toast } from 'sonner';
