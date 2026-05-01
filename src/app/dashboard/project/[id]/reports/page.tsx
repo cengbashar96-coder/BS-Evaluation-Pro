@@ -6,7 +6,8 @@ import {
   RefreshCcw, Image as ImageIcon 
 } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
-import { generateProfessionalPDF } from '@/lib/report-generator';
+// التعديل الصحيح للمسار بناءً على هيكلية مشروعك الحالية
+import { generateProfessionalPDF } from '@/store/lib/report-generator';
 import { getSecureImageUrl } from '@/actions/storage-actions';
 import { toast } from 'sonner';
 
