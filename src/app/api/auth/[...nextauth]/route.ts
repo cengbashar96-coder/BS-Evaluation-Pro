@@ -5,7 +5,8 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-const handler = NextAuth({
+// تم فصل الإعدادات هنا مع إضافة export لحل مشكلة استيراد authOptions
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -16,19 +17,16 @@ const handler = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // البحث عن المستخدم في قاعدة البيانات
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         });
 
         if (!user) throw new Error("لا يوجد مستخدم بهذا البريد");
 
-        // التأكد من أن الحساب مفعّل من قبلك (المدير)
         if (!user.isActivated) {
           throw new Error("حسابك قيد المراجعة، يرجى التواصل مع الإدارة للتفعيل");
         }
 
-        // مطابقة كلمة المرور
         const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
         if (!isPasswordValid) throw new Error("كلمة المرور خاطئة");
 
@@ -58,9 +56,11 @@ const handler = NextAuth({
     }
   },
   pages: {
-    signIn: "/auth/signin", // الصفحة التي سننشئها لاحقاً
+    signIn: "/auth/signin",
   },
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
