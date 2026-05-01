@@ -1,28 +1,37 @@
 'use client'
 
-import { useState } from 'react';
-import { Upload, Loader2, X, ImageIcon, CheckCircle2 } from 'lucide-react';
-import { uploadImageToR2 } from '@/actions/storage-actions';
+import { useState, useEffect } from 'react';
+import { Upload, Loader2, X, ImageIcon, ShieldCheck } from 'lucide-react';
+import { uploadImageSecurely, getSecureImageUrl } from '@/actions/storage-actions';
 import { toast } from 'sonner';
 
 interface ImageUploaderProps {
-  onUploadSuccess: (url: string) => void;
-  defaultValue?: string;
+  projectId: string;
+  onUploadSuccess: (key: string) => void;
+  defaultKey?: string;
   label?: string;
-  className?: string;
 }
 
-export default function ImageUploader({ onUploadSuccess, defaultValue, label, className }: ImageUploaderProps) {
+export default function ImageUploader({ projectId, onUploadSuccess, defaultKey, label }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState(defaultValue || '');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [currentKey, setCurrentKey] = useState(defaultKey || '');
+
+  // توليد رابط معاينة آمن عند وجود مفتاح مخزن مسبقاً
+  useEffect(() => {
+    async function loadSecurePreview() {
+      if (currentKey) {
+        const url = await getSecureImageUrl(currentKey);
+        setPreviewUrl(url);
+      }
+    }
+    loadSecurePreview();
+  }, [currentKey]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    // التحقق من حجم الملف (أقصى حد 5 ميجابايت مثلاً)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("حجم الصورة كبير جداً، الحد الأقصى 5MB");
+    if (!file || !projectId) {
+      if (!projectId) toast.error("خطأ: لم يتم تحديد معرف المشروع");
       return;
     }
 
@@ -31,61 +40,66 @@ export default function ImageUploader({ onUploadSuccess, defaultValue, label, cl
     formData.append('file', file);
 
     try {
-      const result = await uploadImageToR2(formData);
-      if (result.success && result.url) {
-        setPreview(result.url);
-        onUploadSuccess(result.url); // تمرير الرابط للـ Store
-        toast.success("تم الرفع والحفظ سحابياً");
+      // الرفع باستخدام النظام الفائق الأمان
+      const result = await uploadImageSecurely(formData, projectId);
+      
+      if (result.success && result.key) {
+        setCurrentKey(result.key);
+        onUploadSuccess(result.key); // نرسل الـ Key لقاعدة البيانات وليس الرابط
+        
+        // جلب رابط معاينة مؤقت لعرضه للمستخدم الآن
+        const secureUrl = await getSecureImageUrl(result.key);
+        setPreviewUrl(secureUrl);
+        
+        toast.success("تم تشفير ورفع الصورة بنجاح");
       } else {
-        toast.error(result.error || "فشل الرفع");
+        toast.error(result.error || "فشل الرفع الأمني");
       }
     } catch (error) {
-      toast.error("خطأ في الاتصال بالسحاب");
+      toast.error("خطأ في الاتصال بالخادم السحابي");
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {label && <label className="text-sm font-bold text-slate-700 dark:text-slate-300">{label}</label>}
+    <div className="space-y-3 w-full text-right" dir="rtl">
+      {label && <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+        {label}
+        <ShieldCheck className="h-4 w-4 text-emerald-500" title="تخزين مشفر ومحمي" />
+      </label>}
       
-      <div className="relative group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4 bg-white dark:bg-slate-900 hover:border-emerald-500/50 hover:bg-slate-50 transition-all flex flex-col items-center justify-center min-h-[180px] overflow-hidden shadow-sm">
+      <div className="relative group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4 bg-white dark:bg-slate-900 transition-all min-h-[180px] flex flex-col items-center justify-center overflow-hidden">
         
-        {preview ? (
-          <div className="relative w-full h-full flex flex-col items-center">
-            <img src={preview} alt="Preview" className="max-h-[140px] w-auto rounded-lg object-contain mb-2 shadow-md" />
-            <div className="flex gap-2">
-              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> مؤمن سحابياً
-              </span>
+        {previewUrl ? (
+          <div className="relative w-full group">
+            <img src={previewUrl} alt="Preview" className="max-h-48 mx-auto rounded-xl object-contain shadow-sm" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
               <button 
-                onClick={() => { setPreview(''); onUploadSuccess(''); }}
-                className="p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                title="حذف الصورة"
+                onClick={() => { setPreviewUrl(null); setCurrentKey(''); onUploadSuccess(''); }}
+                className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
           </div>
         ) : (
-          <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center py-6">
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-full mb-3 group-hover:scale-110 transition-transform">
+          <label className="cursor-pointer w-full flex flex-col items-center justify-center py-4">
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full mb-3">
               {uploading ? (
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
               ) : (
-                <ImageIcon className="h-8 w-8 text-emerald-600" />
+                <Upload className="h-8 w-8 text-slate-400" />
               )}
             </div>
-            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-              {uploading ? "جاري المعالجة السحابية..." : "ارفع صورة المعاينة الفنية"}
-            </p>
-            <p className="text-[10px] text-slate-400 mt-1">PNG, JPG حتى 5MB</p>
+            <span className="text-sm font-semibold text-slate-600">
+              {uploading ? "جاري التشفير والرفع..." : "اختر صورة المعاينة الفنية"}
+            </span>
             <input 
               type="file" 
               className="hidden" 
-              accept="image/*" 
               onChange={handleFileChange} 
+              accept="image/*" 
               disabled={uploading} 
             />
           </label>
