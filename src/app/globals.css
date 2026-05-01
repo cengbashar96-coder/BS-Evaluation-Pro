@@ -1,5 +1,10 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* إذا كنت تحتاج tw-animate-css ابقِ عليه بالأسفل */
 @import "tw-animate-css";
+
 
 @custom-variant dark (&:is(.dark *));
 
