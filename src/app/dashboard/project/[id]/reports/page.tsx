@@ -1,128 +1,150 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  FileText, 
-  Download, 
-  Printer, 
-  Eye, 
-  RefreshCcw, 
-  CheckCircle,
-  FileCheck2
+  FileCheck2, Download, ShieldCheck, 
+  RefreshCcw, Image as ImageIcon 
 } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
-import { Button } from '@/components/ui/button'; // تأكد من وجود مكونات UI لديك
-import { toast } from 'sonner';
+import { generateProfessionalPDF } from '@/lib/report-generator';
 import { getSecureImageUrl } from '@/actions/storage-actions';
+import { toast } from 'sonner';
 
 export default function ReportsPage({ params }: { params: { id: string } }) {
-  const { buildingInfo, structuralReport, foundations } = useProjectStore();
+  const { buildingInfo } = useProjectStore();
   const [generating, setGenerating] = useState(false);
+  const [secureImageUrl, setSecureImageUrl] = useState<string | null>(null);
 
-  // دالة لمحاكاة توليد التقرير (سنربطها بـ jsPDF لاحقاً)
-  const handleGeneratePDF = async () => {
-    setGenerating(true);
-    try {
-      // هنا سيتم استدعاء محرك PDF وتضمين الصور الموقعة
-      toast.success("جاري تحضير النسخة المهنية من التقرير...");
-      
-      // منطق التوليد سيتم وضعه هنا
-      
-      setTimeout(() => {
-        setGenerating(false);
-        toast.info("تم توليد التقرير بنجاح (نسخة تجريبية)");
-      }, 2000);
-    } catch (error) {
-      setGenerating(false);
-      toast.error("فشل توليد التقرير");
+  // جلب رابط المعاينة المؤمن من السحاب عند تحميل الصفحة
+  useEffect(() => {
+    async function fetchImage() {
+      if (buildingInfo?.locationImage) {
+        // نستخدم الدالة الجديدة لجلب رابط مؤقت وآمن
+        const url = await getSecureImageUrl(buildingInfo.locationImage);
+        setSecureImageUrl(url);
+      }
     }
+    fetchImage();
+  }, [buildingInfo?.locationImage]);
+
+  const handleDownload = async () => {
+    setGenerating(true);
+    // استدعاء محرك الطباعة الذي أنشأناه في lib
+    const success = await generateProfessionalPDF('report-content', `Report-${params.id}`);
+    
+    if (success) {
+      toast.success("تم توليد وتحميل التقرير بنجاح");
+    } else {
+      toast.error("حدث خطأ أثناء توليد ملف PDF");
+    }
+    setGenerating(false);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-right" dir="rtl">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-100 p-4 md:p-10 text-right" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Header */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
+        {/* شريط التحكم العلوي - ثابت عند التمرير */}
+        <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-white sticky top-4 z-50 flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-              <FileCheck2 className="text-emerald-600" />
-              توليد التقارير الفنية والهندسية
+              <FileCheck2 className="text-emerald-600 h-7 w-7" />
+              مركز التقارير الهندسية
             </h1>
-            <p className="text-slate-500 text-sm mt-1">المشروع: {buildingInfo?.ownerName || 'قيد المعالجة'}</p>
+            <p className="text-slate-500 text-sm font-medium">مشروع: {buildingInfo?.ownerName || params.id.slice(0,8)}</p>
           </div>
-          <Button 
-            onClick={handleGeneratePDF}
+          
+          <button 
+            onClick={handleDownload}
             disabled={generating}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 px-6 py-6 rounded-xl shadow-lg"
+            className="w-full md:w-auto bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
           >
-            {generating ? <RefreshCcw className="animate-spin" /> : <Download size={18} />}
-            توليد ملف PDF
-          </Button>
+            {generating ? <RefreshCcw className="animate-spin h-5 w-5" /> : <Download className="h-5 w-5" />}
+            تحميل التقرير (PDF)
+          </button>
         </div>
 
-        {/* Preview Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm min-h-[600px] relative overflow-hidden">
-              {/* ترويسة التقرير الهندسي */}
-              <div className="text-center border-b-2 border-slate-100 pb-6 mb-8">
-                <h2 className="text-xl font-bold text-slate-800 tracking-tight">تقرير تقييم الوضع الراهن للمنشأة</h2>
-                <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">B.S Evaluation Technical Report</p>
+        {/* جسم التقرير - هذا الجزء هو الذي سيتم تصويره وتحويله لـ PDF */}
+        <div className="flex flex-col items-center">
+          <div 
+            id="report-content" 
+            className="bg-white w-full max-w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl rounded-sm text-slate-900"
+          >
+            {/* الترويسة الفنية */}
+            <div className="flex justify-between items-start border-b-4 border-slate-900 pb-6 mb-10">
+              <div className="text-right">
+                <h2 className="text-2xl font-black italic">B.S EVALUATION</h2>
+                <p className="text-sm font-bold text-slate-500 tracking-tight">Technical Structural Assessment</p>
+                <p className="text-[10px] text-slate-400 mt-1 uppercase">Approved Engineering Report</p>
               </div>
+              <div className="text-left text-[10px] text-slate-500 font-mono leading-relaxed">
+                REF: {params.id.toUpperCase()}<br/>
+                DATE: {new Date().toLocaleDateString('en-GB')}<br/>
+                LOC: SYRIA / SITE-INFO
+              </div>
+            </div>
 
-              {/* ملخص البيانات */}
-              <div className="space-y-4 text-sm text-slate-700">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-slate-400 mb-1">اسم المالك</span>
+            {/* محتوى البيانات */}
+            <div className="space-y-10">
+              <section>
+                <h3 className="text-lg font-black mb-4 border-r-4 border-emerald-500 pr-3 bg-slate-50 py-1">1. المعلومات الأساسية</h3>
+                <div className="grid grid-cols-2 gap-x-12 gap-y-4 text-sm px-4">
+                  <div className="flex justify-between border-b border-slate-100 pb-1">
+                    <span className="text-slate-400">اسم المالك:</span>
                     <span className="font-bold">{buildingInfo?.ownerName || '---'}</span>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-slate-400 mb-1">تاريخ الكشف</span>
+                  <div className="flex justify-between border-b border-slate-100 pb-1">
+                    <span className="text-slate-400">رقم العقار:</span>
+                    <span className="font-bold">{buildingInfo?.propertyNumber || '---'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-1">
+                    <span className="text-slate-400">عدد الطوابق:</span>
+                    <span className="font-bold">{buildingInfo?.floorCount || '0'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-1">
+                    <span className="text-slate-400">تاريخ الكشف:</span>
                     <span className="font-bold">{new Date().toLocaleDateString('ar-SY')}</span>
                   </div>
                 </div>
+              </section>
 
-                {/* مكان عرض صورة الموقع المرفوعة سحابياً */}
-                <div className="mt-6">
-                  <h3 className="font-bold text-slate-800 mb-3 border-r-4 border-emerald-500 pr-2">توثيق الموقع العام</h3>
-                  <div className="aspect-video bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden">
-                    {buildingInfo?.locationImage ? (
-                       <img src={buildingInfo.locationImage} alt="Site" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-slate-400 text-xs italic text-center px-10">لم يتم رفع صورة للموقع العام، سيتم ترك مساحة بيضاء في التقرير النهائي</span>
-                    )}
+              <section>
+                <h3 className="text-lg font-black mb-4 border-r-4 border-emerald-500 pr-3 bg-slate-50 py-1">2. التوثيق الفوتوغرافي للموقع</h3>
+                <div className="border-2 border-slate-100 rounded-3xl overflow-hidden bg-slate-50 aspect-video flex items-center justify-center relative shadow-inner">
+                  {secureImageUrl ? (
+                    <img 
+                      src={secureImageUrl} 
+                      alt="Site Survey" 
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous" 
+                    />
+                  ) : (
+                    <div className="text-center text-slate-300 italic">
+                      <ImageIcon className="h-16 w-16 mx-auto mb-2 opacity-10" />
+                      <p className="text-xs italic">بانتظار رفع صورة المعاينة الفنية...</p>
+                    </div>
+                  )}
+                  {secureImageUrl && (
+                    <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-emerald-100 shadow-sm text-emerald-700">
+                      <ShieldCheck className="h-3 w-3" />
+                      مصادقة سحابية R2
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* تذييل التقرير */}
+              <div className="pt-20 mt-20 border-t border-slate-100 text-center">
+                <div className="flex justify-around mb-12">
+                  <div className="text-center">
+                    <p className="text-xs font-bold mb-8 text-slate-400 italic">ختم وتوقيع المهندس المعاين</p>
+                    <div className="w-32 h-1 bg-slate-100 mx-auto"></div>
                   </div>
                 </div>
+                <p className="text-[9px] text-slate-400 font-medium">
+                  تم إصدار هذا التقرير الفني آلياً بواسطة نظام BS-Evaluation. المعلومات الواردة تخضع لمسؤولية المهندس المعاين.
+                </p>
               </div>
-            </div>
-          </div>
-
-          {/* Sidebar Settings */}
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-4">خيارات الطباعة</h3>
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                  <input type="checkbox" defaultChecked className="accent-emerald-600 h-4 w-4" />
-                  <span className="text-xs font-medium">تضمين الصور الفنية</span>
-                </label>
-                <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                  <input type="checkbox" defaultChecked className="accent-emerald-600 h-4 w-4" />
-                  <span className="text-xs font-medium">إظهار الحسابات الإنشائية</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
-              <h3 className="font-bold text-emerald-800 mb-2 flex items-center gap-2">
-                <CheckCircle size={16} />
-                جاهزية التقرير
-              </h3>
-              <p className="text-[11px] text-emerald-600 leading-relaxed italic">
-                تم التحقق من جميع البيانات المدخلة ومزامنتها مع السحاب. التقرير سيتم توليده وفق معايير الكود السوري.
-              </p>
             </div>
           </div>
         </div>
