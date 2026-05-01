@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, Upload, Image as ImageIcon, X, Droplets, Activity } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore, type PlumbingReport } from '@/store/projectStore';
 import { toast } from 'sonner';
 
