@@ -13,7 +13,7 @@ import {
   FileText, Printer, FileDown, Loader2, CheckCircle2, 
   Building2, Zap, Droplets, ShieldCheck, UserCheck, MapPin
 } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore } from '@/store/projectStore';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
