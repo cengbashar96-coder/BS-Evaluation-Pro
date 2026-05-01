@@ -76,3 +76,16 @@ export async function getSecureImageUrl(key: string) {
     return null;
   }
 }
+/**
+ * دالة مخصصة لجلب روابط الصور دفعة واحدة للتقرير
+ * @param keys مصفوفة من مفاتيح الصور
+ */
+export async function getSecureImagesForReport(keys: string[]) {
+  const urls = await Promise.all(
+    keys.map(async (key) => {
+      if (!key) return null;
+      return await getSecureImageUrl(key);
+    })
+  );
+  return urls.filter(url => url !== null);
+}
