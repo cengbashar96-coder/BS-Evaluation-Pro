@@ -1,31 +1,24 @@
 'use server'
 
 import { createClient } from '@supabase/supabase-js'
-import { v4 as uuidv4 } from 'uuid'
 
-// إعداد عميل Supabase باستخدام المتغيرات الموجودة في ملف .env
+// ربط الكود ببيانات مشروعك في Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // تأكد من وجود هذا المفتاح في ملفك
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-/**
- * دالة رفع الصور الهندسية لـ Supabase
- */
 export async function uploadImageSecurely(formData: FormData, projectId: string) {
   try {
     const file = formData.get('file') as File;
     if (!file) throw new Error("لم يتم اختيار ملف");
 
-    // فحص الحجم (5MB كحد أقصى)
-    if (file.size > 5 * 1024 * 1024) throw new Error("حجم الصورة كبير جداً");
-
-    const fileExtension = file.name.split('.').pop();
-    // تنظيم المسار داخل المجلدات برقم المشروع
-    const filePath = `${projectId}/${uuidv4()}.${fileExtension}`;
+    // نستخدم اسم الملف الأصلي مع طابع زمني لمنع تكرار الأسماء
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = `${projectId}/${fileName}`;
 
     const { data, error } = await supabase.storage
-      .from('project-assets')
+      .from('project-assets') // الاسم الذي أنشأته في الصورة
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: true
@@ -33,27 +26,21 @@ export async function uploadImageSecurely(formData: FormData, projectId: string)
 
     if (error) throw error;
 
-    // نعيد الـ path لكي يتم حفظه في قاعدة بيانات المشروع
+    // نعيد المسار (key) ليتم حفظه في قاعدة البيانات
     return { success: true, key: data.path };
   } catch (error: any) {
-    console.error("Storage Error:", error.message);
+    console.error("Upload Error:", error.message);
     return { success: false, error: error.message };
   }
 }
 
-/**
- * دالة جلب رابط الصورة لعرضها في التقارير
- */
 export async function getSecureImageUrl(key: string) {
   if (!key) return null;
   
-  try {
-    const { data } = supabase.storage
-      .from('project-assets')
-      .getPublicUrl(key);
+  // بما أن الـ Bucket "Public"، نطلب الرابط العام مباشرة
+  const { data } = supabase.storage
+    .from('project-assets')
+    .getPublicUrl(key);
 
-    return data.publicUrl;
-  } catch (error) {
-    return null;
-  }
+  return data.publicUrl;
 }
