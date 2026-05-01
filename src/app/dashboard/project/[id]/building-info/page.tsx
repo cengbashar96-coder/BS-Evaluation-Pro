@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, Upload, Building2, Info, Calendar, MapPin } from 'lucide-react';
-import { useTranslation } from ''@/store/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore, type BuildingInfo } from '@/store/projectStore';
 import { toast } from 'sonner';
 
