@@ -1,42 +1,78 @@
 'use server'
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { s3Client, BUCKET_NAME } from "@/store/lib/s3-client"; // المسار المحدث
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3Client, BUCKET_NAME } from "@/store/lib/s3-client";
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * دالة عالمية لرفع الصور إلى Cloudflare R2
- * @param formData يحتوي على الملف المراد رفعه
- * @returns رابط الصورة السحابي أو رسالة خطأ
+ * دالة رفع الصور بشكل آمن ومشفر إلى Cloudflare R2
+ * @param formData الملف المراد رفعه
+ * @param projectId معرف المشروع لضمان عزل البيانات
  */
-export async function uploadImageToR2(formData: FormData) {
+export async function uploadImageSecurely(formData: FormData, projectId: string) {
   try {
     const file = formData.get('file') as File;
     if (!file) throw new Error("لم يتم اختيار ملف");
 
-    // تحويل الملف إلى Buffer لمعالجته برمجياً
+    // 1. فحص الحماية: التأكد من نوع الملف (فقط صور)
+    if (!file.type.startsWith('image/')) {
+      throw new Error("نوع الملف غير مدعوم، يرجى رفع صور فقط");
+    }
+
+    // 2. فحص الحجم (الحد الأقصى 5 ميجابايت)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("حجم الصورة يتجاوز الحد المسموح به (5MB)");
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // توليد اسم فريد عالمياً (UUID) لمنع تداخل الصور
+    // 3. تنظيم المسار: تخزين داخل مجلد المشروع لخصوصية تامة
     const fileExtension = file.name.split('.').pop();
-    const fileName = `projects/uploads/${uuidv4()}.${fileExtension}`;
+    const fileKey = `projects/${projectId}/${uuidv4()}.${fileExtension}`;
 
-    // تنفيذ أمر الرفع
+    // 4. تنفيذ الرفع كملف خاص (Private Object)
     await s3Client.send(new PutObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: fileName,
+      Key: fileKey,
       Body: buffer,
       ContentType: file.type,
-      // ACL: 'public-read', // يعتمد على إعدادات الـ Bucket لديك
+      // Metadata لتعزيز التتبع والأمان
+      Metadata: {
+        "uploaded-by-project": projectId,
+        "original-name": encodeURIComponent(file.name)
+      }
     }));
 
-    // الرابط النهائي للصورة
-    const imageUrl = `${process.env.R2_PUBLIC_URL}/${fileName}`;
+    // 5. إعادة مفتاح الملف (Key) وليس الرابط العام لضمان الأمان
+    return { success: true, key: fileKey };
+  } catch (error: any) {
+    console.error("Critical Storage Error:", error.message);
+    return { success: false, error: error.message || "فشل في تأمين ورفع الصورة" };
+  }
+}
 
-    return { success: true, url: imageUrl };
+/**
+ * توليد رابط معاينة مؤقت وآمن (Signed URL)
+ * الرابط يعمل فقط لمدة ساعة واحدة لمنع التسريب
+ * @param key مفتاح الملف المخزن في R2
+ */
+export async function getSecureImageUrl(key: string) {
+  if (!key) return null;
+  
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    // توليد رابط موقع ينتهي بعد 3600 ثانية (ساعة واحدة)
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    
+    return signedUrl;
   } catch (error) {
-    console.error("Cloudflare R2 Upload Error:", error);
-    return { success: false, error: "فشل في تأمين ورفع الصورة للسحاب" };
+    console.error("Security Link Generation Error:", error);
+    return null;
   }
 }
