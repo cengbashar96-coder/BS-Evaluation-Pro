@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Plus, Edit2, Trash2, Save, Square, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
-import { useTranslation } from '@/lib/i18n/translations';
+import { useTranslation } from '@/store/lib/i18n/translations';
 import { useProjectStore, ColumnWall } from '@/store/projectStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { toast } from 'sonner';
