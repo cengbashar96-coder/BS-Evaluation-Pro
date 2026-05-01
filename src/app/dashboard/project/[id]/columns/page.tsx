@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,8 +26,11 @@ import { useProjectStore, ColumnWall } from '@/store/projectStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { toast } from 'sonner';
 
-export default function Columns() {
+export default function ColumnsPage() {
   const { t, language } = useTranslation();
+  const params = useParams();
+  const projectId = params.id as string; // الحصول على معرف المشروع من المسار
+
   const { projectInfo, updateColumns } = useProjectStore();
   const { stressUnit } = useSettingsStore();
 
@@ -44,43 +48,43 @@ export default function Columns() {
     totalLoad: undefined,
   });
 
-  // تحميل البيانات الأولية مع ضمان الربط الأمني
+  // مزامنة البيانات مع هوية المشروع والمستخدم
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const storedColumns = localStorage.getItem('bs-columns');
+      const storedColumns = localStorage.getItem(`bs-columns-${projectId}`);
       if (storedColumns) setColumns(JSON.parse(storedColumns));
 
-      const storedFloors = localStorage.getItem('bs-floor-reports');
+      const storedFloors = localStorage.getItem(`bs-floor-reports-${projectId}`);
       if (storedFloors) {
         const floorReports = JSON.parse(storedFloors);
         setFloors(floorReports.map((f: any) => f.floorNumber).filter(Boolean));
       }
 
-      const storedStructural = localStorage.getItem('bs-structural-report');
+      const storedStructural = localStorage.getItem(`bs-structural-report-${projectId}`);
       if (storedStructural) {
         const structuralReport = JSON.parse(storedStructural);
         setSchmidtConcreteStrength(structuralReport.schmidtConcreteStrength || 0);
       }
     }
-  }, []);
+  }, [projectId]);
 
-  // محرك الحساب الكلاسيكي (WSD) المدمج مع الأحمال التراكمية
+  // محرك الحساب الكلاسيكي (WSD) - إجهادات التشغيل
   const calculateColumnValues = (column: ColumnWall): ColumnWall => {
     if (!column.width || !column.depth || !column.totalLoad) {
       return { ...column, actualStress: undefined, allowableStress: undefined, isVerified: undefined };
     }
 
-    // جلب معامل عدد الطوابق (n) من المتجر
+    // معامل التراكم بناءً على عدد الطوابق المسجل في حساب المستخدم للمشروع
     const n = projectInfo?.floorCount || 1;
     const sectionArea = column.width * column.depth;
 
-    // الحمل التراكمي الكلاسيكي (بدون تصعيد)
+    // الحمل التراكمي (بدون تصعيد - طريقة كلاسيكية)
     const totalLoadKg = (column.totalLoad * n) * 1000; 
     
-    // الإجهاد الفعلي (كغ/سم²)
+    // الإجهاد الفعلي كغ/سم²
     const actualStress = totalLoadKg / sectionArea;
 
-    // الإجهاد المسموح (0.3 * قوة شميدت) - المعيار الكلاسيكي
+    // الإجهاد المسموح = 0.3 * مقاومة شميدت (معيار الأمان الكلاسيكي)
     const allowableStress = 0.3 * schmidtConcreteStrength;
 
     return {
@@ -91,24 +95,17 @@ export default function Columns() {
     };
   };
 
-  // إعادة الحساب التلقائي عند تغير قوة شميدت أو عدد الطوابق
-  useEffect(() => {
-    if (columns.length > 0) {
-      const recalculated = columns.map(col => calculateColumnValues(col));
-      setColumns(recalculated);
-    }
-  }, [schmidtConcreteStrength, projectInfo?.floorCount]);
-
   const handleSave = async () => {
     setLoading(true);
     try {
       const finalColumns = columns.map(col => calculateColumnValues(col));
       setColumns(finalColumns);
-      localStorage.setItem('bs-columns', JSON.stringify(finalColumns));
+      // حفظ البيانات مرتبطة بمعرف المشروع لضمان خصوصية حساب المستخدم
+      localStorage.setItem(`bs-columns-${projectId}`, JSON.stringify(finalColumns));
       updateColumns(finalColumns);
-      toast.success('تم حفظ وتأمين بيانات الأعمدة بنجاح');
+      toast.success('تم تأمين وحفظ بيانات الأعمدة للمشروع');
     } catch (error) {
-      toast.error('خطأ في مزامنة البيانات');
+      toast.error('حدث خطأ أثناء المزامنة');
     } finally {
       setLoading(false);
     }
@@ -116,7 +113,7 @@ export default function Columns() {
 
   const handleAddColumn = () => {
     if (!formData.columnType || !formData.floorNumber || !formData.width || !formData.depth || !formData.totalLoad) {
-      toast.error('يرجى إكمال البيانات الهندسية المطلوبة');
+      toast.error('يرجى ملء كافة المعطيات الإنشائية');
       return;
     }
 
@@ -134,83 +131,89 @@ export default function Columns() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* تنبيه عدد الطوابق */}
-      <Alert className="bg-blue-50 border-blue-200">
-        <AlertCircle className="h-4 w-4 text-blue-600" />
-        <AlertTitle className="text-blue-800 font-bold">معطيات النظام</AlertTitle>
-        <AlertDescription className="text-blue-700">
-          يتم الحساب بناءً على <span className="font-bold underline">{projectInfo?.floorCount || 1} طابق/طوابق</span> (تراكمي) وقوة شميدت <span className="font-bold">{schmidtConcreteStrength}</span> كغ/سم².
+    <div className="space-y-6 max-w-5xl mx-auto p-4">
+      {/* نظام التنبيه الذكي للمستخدم */}
+      <Alert className="bg-emerald-50 border-emerald-200">
+        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <AlertTitle className="text-emerald-800 font-bold underline">نظام الحساب الكلاسيكي النشط (WSD)</AlertTitle>
+        <AlertDescription className="text-emerald-700">
+          المشروع الحالي: <span className="font-bold">{projectId}</span> | 
+          عدد الطوابق التراكمي: <span className="font-bold">{projectInfo?.floorCount || 1}</span> | 
+          قوة شميدت المعتمدة: <span className="font-bold">{schmidtConcreteStrength} كغ/سم²</span>
         </AlertDescription>
       </Alert>
 
-      <Card className="border-t-4 border-t-emerald-500">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-emerald-700">
-            <Square className="h-5 w-5" /> {t.columns.title} (طريقة WSD)
+      <Card className="shadow-lg border-t-4 border-t-emerald-600">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold text-slate-800 flex justify-center gap-2">
+            <Square className="h-6 w-6 text-emerald-600" /> مدخلات أعمدة المشروع
           </CardTitle>
+          <CardDescription>أدخل أبعاد المقطع وحمل الطابق الواحد للحساب التراكمي</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>نوع العنصر</Label>
-            <Select value={formData.columnType} onValueChange={(v) => setFormData({...formData, columnType: v})}>
-              <SelectTrigger><SelectValue placeholder="اختر النوع" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="وسطي">عمود وسطي</SelectItem>
-                <SelectItem value="طرفي">عمود طرفي</SelectItem>
-                <SelectItem value="ركني">عمود ركني</SelectItem>
-                <SelectItem value="جدار">جدار قص</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>حمل الطابق الواحد (طن)</Label>
-            <Input type="number" value={formData.totalLoad || ''} onChange={(e) => setFormData({...formData, totalLoad: parseFloat(e.target.value)})} placeholder="0.00" />
-          </div>
-          <div className="space-y-2">
-            <Label>العرض × العمق (سم)</Label>
-            <div className="flex gap-2">
-              <Input type="number" placeholder="B" value={formData.width || ''} onChange={(e) => setFormData({...formData, width: parseFloat(e.target.value)})} />
-              <Input type="number" placeholder="H" value={formData.depth || ''} onChange={(e) => setFormData({...formData, depth: parseFloat(e.target.value)})} />
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label className="font-bold">موقع العمود</Label>
+              <Select value={formData.columnType} onValueChange={(v) => setFormData({...formData, columnType: v})}>
+                <SelectTrigger><SelectValue placeholder="اختر الموقع" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="وسطي">عمود وسطي</SelectItem>
+                  <SelectItem value="طرفي">عمود طرفي</SelectItem>
+                  <SelectItem value="ركني">عمود ركني</SelectItem>
+                  <SelectItem value="جدار">جدار قص</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-bold">حمل الطابق الواحد (طن)</Label>
+              <Input type="number" value={formData.totalLoad || ''} onChange={(e) => setFormData({...formData, totalLoad: parseFloat(e.target.value)})} placeholder="مثلاً: 25" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-bold">أبعاد المقطع (B x H) سم</Label>
+              <div className="flex gap-2">
+                <Input type="number" placeholder="العرض" value={formData.width || ''} onChange={(e) => setFormData({...formData, width: parseFloat(e.target.value)})} />
+                <Input type="number" placeholder="العمق" value={formData.depth || ''} onChange={(e) => setFormData({...formData, depth: parseFloat(e.target.value)})} />
+              </div>
             </div>
           </div>
-          <Button onClick={handleAddColumn} className="md:col-span-3 bg-emerald-600 hover:bg-emerald-700 gap-2">
-            <Plus className="h-4 w-4" /> {editingIndex !== null ? 'تحديث البيانات' : 'إضافة العمود للقائمة'}
+          <Button onClick={handleAddColumn} className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-lg">
+            {editingIndex !== null ? 'تحديث العمود' : 'إضافة العمود للقائمة'}
           </Button>
         </CardContent>
       </Card>
 
-      <Accordion type="multiple" className="space-y-3">
+      <div className="space-y-4">
         {columns.map((col, idx) => (
-          <AccordionItem key={col.id} value={`col-${idx}`} className={`border rounded-lg px-4 ${!col.isVerified ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}>
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex justify-between w-full items-center">
-                <span className="font-bold text-slate-700">{col.columnType} - {col.width}x{col.depth} سم</span>
-                {col.isVerified ? <CheckCircle2 className="text-emerald-500" /> : <XCircle className="text-red-500" />}
+          <div key={col.id} className={`p-5 border-2 rounded-xl transition-all ${!col.isVerified ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white'}`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-black text-lg text-slate-800">{col.columnType} ({col.width}x{col.depth} سم)</h3>
+              {col.isVerified ? 
+                <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold">آمن إنشائياً</span> : 
+                <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">خطر - تجاوز الإجهاد</span>
+              }
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="bg-white/50 p-3 rounded-lg border border-slate-100">
+                <p className="text-xs font-bold text-slate-500">الإجهاد الفعلي (كلاسيك)</p>
+                <p className={`text-xl font-black ${col.isVerified ? 'text-emerald-700' : 'text-red-700'}`}>{col.actualStress} كغ/سم²</p>
               </div>
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4">
-              <div className={`p-4 rounded-md grid grid-cols-2 gap-4 ${col.isVerified ? 'bg-emerald-100/50' : 'bg-red-100/50'}`}>
-                <div>
-                  <p className="text-xs font-bold text-slate-500">الإجهاد الفعلي (التراكمي):</p>
-                  <p className={`text-xl font-black ${col.isVerified ? 'text-emerald-700' : 'text-red-700'}`}>{col.actualStress} كغ/سم²</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-slate-500">الإجهاد المسموح (كلاسيكي):</p>
-                  <p className="text-xl font-black text-slate-700">{col.allowableStress} كغ/سم²</p>
-                </div>
+              <div className="bg-white/50 p-3 rounded-lg border border-slate-100">
+                <p className="text-xs font-bold text-slate-500">الإجهاد المسموح (0.3 fc)</p>
+                <p className="text-xl font-black text-slate-700">{col.allowableStress} كغ/سم²</p>
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => {setEditingIndex(idx); setFormData(col)}}><Edit2 className="h-3 w-3 mr-1"/> تعديل</Button>
-                <Button variant="destructive" size="sm" onClick={() => setColumns(columns.filter((_, i) => i !== idx))}><Trash2 className="h-3 w-3 mr-1"/> حذف</Button>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+            </div>
 
-      <Button onClick={handleSave} disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 py-6 text-lg shadow-lg">
-        <Save className="mr-2 h-5 w-5" /> {loading ? 'جاري المزامنة...' : 'حفظ ومزامنة كافة الأعمدة'}
+            <div className="flex justify-end gap-2 mt-4 border-t pt-3">
+              <Button variant="ghost" size="sm" onClick={() => {setEditingIndex(idx); setFormData(col)}}><Edit2 className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="sm" className="text-red-600" onClick={() => setColumns(columns.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Button onClick={handleSave} disabled={loading} className="w-full h-16 text-xl bg-gradient-to-r from-blue-700 to-indigo-800 shadow-xl">
+        <Save className="mr-2 h-6 w-6" /> {loading ? 'جاري تأمين البيانات...' : 'حفظ ومزامنة كافة الأعمدة'}
       </Button>
     </div>
   );
